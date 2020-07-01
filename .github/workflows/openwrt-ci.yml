@@ -5,16 +5,18 @@
 # Copyright (C) 2019 KFERMercer <KFER.Mercer@gmail.com>
 # 
 # <https://github.com/KFERMercer/OpenWrt-CI>
-# 
+# #
 
 name: OpenWrt-CI
 
 on:
-  schedule:
-    - cron: 0 20 * * *
   push:
-    tags:
-      - '*'
+    branches: 
+      - master
+  # schedule:
+  #   - cron: 0 20 * * *
+  # release:
+  #   types: [published]
 
 jobs:
 
@@ -42,6 +44,16 @@ jobs:
           sudo -E apt-get clean
 
           df -h
+          
+      - name: Custome packages
+        run: |
+          cd package
+          mkdir openwrt-packages
+          cd openwrt-packages
+          git clone https://github.com/openwrt-develop/luci-theme-atmaterial.git
+          # git clone https://github.com/KFERMercer/luci-app-serverchan
+          git clone https://github.com/rosywrt/luci-theme-rosy
+          # git clone https://github.com/Ameykyl/luci-app-koolproxyR
 
       - name: Update feeds
         run: |
@@ -50,7 +62,35 @@ jobs:
           ./scripts/feeds install -a
 
       - name: Generate configuration file
-        run: make defconfig
+        run: |
+          rm -f ./.config*
+          touch ./.config
+          
+          # 取消编译VMware镜像:
+          cat >> .config <<EOF
+          CONFIG_VMDK_IMAGES is not set
+          EOF
+          
+          # 取消编译UEFI固件:
+          cat >> .config <<EOF
+          CONFIG_EFI_IMAGES=n
+          EOF
+          
+          # Compress firmware:
+          cat >> .config <<EOF
+          CONFIG_TARGET_IMAGES_GZIP=y
+          EOF
+          
+          # LuCI theme:
+          cat >> .config <<EOF
+          CONFIG_PACKAGE_luci-theme-argon=y
+          CONFIG_PACKAGE_luci-theme-atmaterial=y
+          CONFIG_PACKAGE_luci-theme-rosy=y
+          # CONFIG_PACKAGE_luci-theme-netgear=y
+          EOF
+          
+          sed -i 's/^[ \t]*//g' ./.config
+          make defconfig
 
       - name: Make download
         run: |
